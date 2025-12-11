@@ -1,4 +1,4 @@
-ARG VERSION=590fb2a2c6164beb85d458b3a212723507a9d8ac
+ARG VERSION=590fb2a
 
 # Build stage
 FROM debian:trixie-slim AS builder
