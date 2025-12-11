@@ -22,7 +22,7 @@ RUN sed -i "s/host_cpu = 'aarch64'/host_cpu = 'aarch64-disabled'/" configure.ac
 # Build
 RUN ./autogen.sh
 RUN ./configure
-RUN make
+RUN make -j$(nproc)
 
 # Final image
 FROM debian:trixie-slim
