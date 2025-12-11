@@ -16,6 +16,9 @@ RUN git clone https://bitbucket.org/ckolivas/ckpool-solo.git .
 RUN git checkout $VERSION
 
 # Hack to disable cpu based optimisations for more portable builds
+# We just make sure the cpu arch checks fail so no optimisations are enabled
+# See: https://bitbucket.org/ckolivas/ckpool-solo/src/590fb2a2c6164beb85d458b3a212723507a9d8ac/configure.ac#lines-60:77
+# Context: https://github.com/getumbrel/umbrel-apps/pull/4230#issuecomment-3643104054
 RUN sed -i "s/host_cpu = 'x86_64'/host_cpu = 'x86_64-disabled'/" configure.ac
 RUN sed -i "s/host_cpu = 'aarch64'/host_cpu = 'aarch64-disabled'/" configure.ac
 
