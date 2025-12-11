@@ -1,6 +1,6 @@
 # docker-ckpool-solo
 
-> Multiarch ckpool-solo Docker image with good portability
+> Multi-arch ckpool-solo Docker image with good portability
 
 Disables all CPU optimisations for wide support accross old and modern amd64 and aarch64 CPUs.
 
