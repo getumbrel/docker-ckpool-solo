@@ -30,4 +30,4 @@ $ docker run -it ghcr.io/getumbrel/docker-ckpool-solo:590fb2a -h
 
 ## License
 
-MIT © Umbrel, Inc. https://getumbrel.com/
+MIT © Umbrel, Inc. https://umbrel.com
