@@ -15,7 +15,6 @@ jobs:
       - name: Set VERSION and TAG
         run: |
           echo "TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
 
@@ -29,6 +28,6 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --build-arg VERSION=${{ env.VERSION }} \
+            --build-arg VERSION=${{ env.TAG }} \
             --tag ghcr.io/${{ github.repository }}:${{ env.TAG }} \
             --push .
