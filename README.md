@@ -7,7 +7,7 @@ Disables all CPU optimisations for wide support accross old and modern amd64 and
 ## Usage
 
 ```
-docker run -it ghcr.io/getumbrel/docker-ckpool-solo:590fb2a -h
+$ docker run -it ghcr.io/getumbrel/docker-ckpool-solo:590fb2a -h
 -B | --btcsolo
 -c CONFIG | --config CONFIG
 -D | --daemonise
