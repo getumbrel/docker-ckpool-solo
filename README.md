@@ -29,7 +29,7 @@ $ docker run -it ghcr.io/getumbrel/docker-ckpool-solo:590fb2a --help
 ```
 
 ```
-$ docker run -it --volume $PWD:/data ghcr.io/getumbrel/docker-ckpool-solo:590fb2a --btcsolo --config /data/ckpool.conf
+$ docker run -it --volume $PWD:/data -p 3333:3333 ghcr.io/getumbrel/docker-ckpool-solo:590fb2a --btcsolo --config /data/ckpool.conf
 [2025-12-11 17:40:54.742] ckpool generator starting
 [2025-12-11 17:40:54.743] ckpool stratifier starting
 [2025-12-11 17:40:54.745] ckpool connector starting
