@@ -1,5 +1,5 @@
-# v1.1.1 release in neew repo
-ARG VERSION=968016e5
+# v1.1.1 release
+ARG VERSION=968016e
 
 # Build stage
 FROM debian:trixie-slim AS builder
