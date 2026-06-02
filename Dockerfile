@@ -1,4 +1,5 @@
-ARG VERSION=590fb2a
+# https://bitbucket.org/ckolivas/ckpool.git v1.1.1 release
+ARG VERSION=968016e
 
 # Build stage
 FROM debian:trixie-slim AS builder
@@ -12,7 +13,7 @@ RUN apt-get update
 RUN apt-get install --yes git build-essential yasm autoconf automake libtool libzmq3-dev pkgconf
 
 # Clone and checkout a specific commit
-RUN git clone https://bitbucket.org/ckolivas/ckpool-solo.git .
+RUN git clone https://bitbucket.org/ckolivas/ckpool.git .
 RUN git checkout $VERSION
 
 # Hack to disable cpu based optimisations for more portable builds
