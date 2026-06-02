@@ -1,4 +1,4 @@
-# docker-ckpool-solo
+# docker-ckpool
 
 > Multi-arch ckpool-solo Docker image with good portability
 
