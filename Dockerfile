@@ -1,4 +1,4 @@
-# v1.1.1 release
+# https://bitbucket.org/ckolivas/ckpool.git v1.1.1 release
 ARG VERSION=968016e
 
 # Build stage
