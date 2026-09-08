@@ -1,33 +1,149 @@
-name: Docker Build and Push
+name: Build and publish container
+
 on:
+  pull_request:
   push:
+    branches:
+      - master
     tags:
-      - "*"
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
-    name: Build and push to GitHub Container Registry
-    runs-on: ubuntu-22.04
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            artifact: amd64
+          - platform: linux/arm64
+            artifact: arm64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -eu
+          upstream_version=$(sed -n 's/^ARG CKPOOL_VERSION=//p' Dockerfile)
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v${upstream_version}-[0-9]+$ ]]; then
+            echo "Release tag must match v${upstream_version}-<packaging-revision>" >&2
+            exit 1
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build and smoke-test image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: docker-ckpool-solo:test-${{ matrix.artifact }}
+          cache-from: type=gha,scope=${{ matrix.artifact }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.artifact }}
+
+      - name: Verify runtime behavior
+        run: |
+          set -eu
+          image="docker-ckpool-solo:test-${{ matrix.artifact }}"
+          test "$(docker image inspect --format '{{.Config.User}}' "$image")" = "1000:1000"
+          docker run --rm "$image" --help
+          docker run --rm --entrypoint /bin/sh "$image" -c \
+            'test "$(id -u):$(id -g)" = "1000:1000" && test -x ./bin/ckpool && ! dpkg-query -W libzmq3-dev'
+
+      - name: Scan runtime image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: docker-ckpool-solo:test-${{ matrix.artifact }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os
+          severity: CRITICAL
+
+  publish:
+    name: Publish multi-architecture image
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
       packages: write
     steps:
-      - name: Set VERSION and TAG
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reject an existing release tag
+        env:
+          RELEASE_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
         run: |
-          echo "TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          if docker buildx imagetools inspect "$RELEASE_IMAGE" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing image tag: $RELEASE_IMAGE" >&2
+            exit 1
+          fi
 
-      - uses: actions/checkout@v4
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=sha,format=short,prefix=sha-
 
-      - name: Login to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+      - name: Build and publish image
+        id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=amd64
+            type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=release
+          provenance: mode=max
+          sbom: true
 
-      - name: Setup Docker buildx
-        run: docker buildx create --use
-
-      - name: Run Docker buildx
-        run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --build-arg VERSION=${{ env.TAG }} \
-            --tag ghcr.io/${{ github.repository }}:${{ env.TAG }} \
-            --push .
+      - name: Attest image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
